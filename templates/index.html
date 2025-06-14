@@ -1,1 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardiovascular Disease Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'medical-blue': '#1e40af',
+                        'medical-red': '#dc2626',
+                        'medical-green': '#059669'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-medical-blue mb-4">
+                🫀 Cardiovascular Risk Predictor
+            </h1>
+            <p class="text-gray-600 text-lg max-w-2xl mx-auto">
+                Enter your health information to get a personalized cardiovascular disease risk assessment 
+                powered by machine learning.
+            </p>
+            <div class="mt-4">
+                <a href="/history" class="inline-block bg-medical-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-300">
+                    📊 View Prediction History
+                </a>
+            </div>
+        </div>
 
+        <div class="max-w-4xl mx-auto">
+            <!-- Error Messages -->
+            {% if errors %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                <strong>Please correct the following errors:</strong>
+                <ul class="mt-2 list-disc list-inside">
+                    {% for error in errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <!-- Prediction Result -->
+            {% if result %}
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 border-l-4 {% if result.prediction == 1 %}border-medical-red{% else %}border-medical-green{% endif %}">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold {% if result.prediction == 1 %}text-medical-red{% else %}text-medical-green{% endif %}">
+                        Prediction Result: {{ result.risk_level }}
+                    </h2>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-600">Risk Probability</div>
+                        <div class="text-3xl font-bold {% if result.prediction == 1 %}text-medical-red{% else %}text-medical-green{% endif %}">
+                            {{ result.probability }}%
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">Your Health Profile</h3>
+                        <div class="space-y-1 text-sm text-gray-600">
+                            <p>BMI: <span class="font-medium">{{ result.bmi }}</span></p>
+                            <p>Blood Pressure: <span class="font-medium">{{ result.user_input.ap_hi }}/{{ result.user_input.ap_lo }} mmHg</span></p>
+                            <p>Age: <span class="font-medium">{{ result.user_input.age }} years</span></p>
+                        </div>
+                    </div>
+                    
+                    {% if result.risk_factors %}
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">Identified Risk Factors</h3>
+                        <ul class="space-y-1 text-sm text-red-600">
+                            {% for factor in result.risk_factors %}
+                            <li>• {{ factor }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% else %}
+                    <div>
+                        <h3 class="font-semibold text-medical-green mb-2">Great News!</h3>
+                        <p class="text-sm text-gray-600">No major risk factors identified based on your input.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Input Form -->
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Health Information Form</h2>
+                
+                <form method="POST" action="/predict" class="space-y-6">
+                    <!-- Personal Information -->
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Age (years)</label>
+                            <input type="number" name="age" min="18" max="100" 
+                                   value="{{ form_data.age if form_data else '' }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue"
+                                   required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                            <select name="gender" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Gender</option>
+                                <option value="1" {% if form_data and form_data.gender == '1' %}selected{% endif %}>Female</option>
+                                <option value="2" {% if form_data and form_data.gender == '2' %}selected{% endif %}>Male</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Height (cm)</label>
+                            <input type="number" name="height" min="100" max="250"
+                                   value="{{ form_data.height if form_data else '' }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue"
+                                   required>
+                        </div>
+                    </div>
+
+                    <!-- Physical Measurements -->
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Weight (kg)</label>
+                            <input type="number" name="weight" min="30" max="200"
+                                   value="{{ form_data.weight if form_data else '' }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue"
+                                   required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Systolic BP (mmHg)</label>
+                            <input type="number" name="ap_hi" min="60" max="200"
+                                   value="{{ form_data.ap_hi if form_data else '' }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue"
+                                   required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Diastolic BP (mmHg)</label>
+                            <input type="number" name="ap_lo" min="40" max="120"
+                                   value="{{ form_data.ap_lo if form_data else '' }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue"
+                                   required>
+                        </div>
+                    </div>
+
+                    <!-- Medical History -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cholesterol Level</label>
+                            <select name="cholesterol" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Level</option>
+                                <option value="1" {% if form_data and form_data.cholesterol == '1' %}selected{% endif %}>Normal</option>
+                                <option value="2" {% if form_data and form_data.cholesterol == '2' %}selected{% endif %}>Above Normal</option>
+                                <option value="3" {% if form_data and form_data.cholesterol == '3' %}selected{% endif %}>Well Above Normal</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Glucose Level</label>
+                            <select name="gluc" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Level</option>
+                                <option value="1" {% if form_data and form_data.gluc == '1' %}selected{% endif %}>Normal</option>
+                                <option value="2" {% if form_data and form_data.gluc == '2' %}selected{% endif %}>Above Normal</option>
+                                <option value="3" {% if form_data and form_data.gluc == '3' %}selected{% endif %}>Well Above Normal</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Lifestyle Factors -->
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Smoking</label>
+                            <select name="smoke" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Option</option>
+                                <option value="0" {% if form_data and form_data.smoke == '0' %}selected{% endif %}>No</option>
+                                <option value="1" {% if form_data and form_data.smoke == '1' %}selected{% endif %}>Yes</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Alcohol Consumption</label>
+                            <select name="alco" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Option</option>
+                                <option value="0" {% if form_data and form_data.alco == '0' %}selected{% endif %}>No</option>
+                                <option value="1" {% if form_data and form_data.alco == '1' %}selected{% endif %}>Yes</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Physical Activity</label>
+                            <select name="active" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-medical-blue" required>
+                                <option value="">Select Option</option>
+                                <option value="0" {% if form_data and form_data.active == '0' %}selected{% endif %}>No</option>
+                                <option value="1" {% if form_data and form_data.active == '1' %}selected{% endif %}>Yes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex justify-center pt-6">
+                        <button type="submit" 
+                                class="bg-medical-blue text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transform hover:scale-105 transition duration-300 shadow-lg">
+                            🔍 Analyze Cardiovascular Risk
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-gray-600">
+            <p class="text-sm">
+                ⚠️ This tool is for educational purposes only. Always consult with healthcare professionals for medical advice.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Form validation and user experience enhancements
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const inputs = form.querySelectorAll('input, select');
+            
+            // Add real-time validation feedback
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    validateInput(this);
+                });
+                
+                input.addEventListener('blur', function() {
+                    validateInput(this);
+                });
+            });
+            
+            function validateInput(input) {
+                const value = input.value;
+                const name = input.name;
+                
+                // Remove previous validation classes
+                input.classList.remove('border-red-500', 'border-green-500');
+                
+                if (value === '') return;
+                
+                let isValid = true;
+                
+                // Specific validations
+                switch(name) {
+                    case 'age':
+                        isValid = value >= 18 && value <= 100;
+                        break;
+                    case 'height':
+                        isValid = value >= 100 && value <= 250;
+                        break;
+                    case 'weight':
+                        isValid = value >= 30 && value <= 200;
+                        break;
+                    case 'ap_hi':
+                        isValid = value >= 60 && value <= 200;
+                        break;
+                    case 'ap_lo':
+                        isValid = value >= 40 && value <= 120;
+                        break;
+                }
+                
+                // Add validation styling
+                if (isValid) {
+                    input.classList.add('border-green-500');
+                } else {
+                    input.classList.add('border-red-500');
+                }
+            }
+            
+            // Blood pressure validation
+            const apHi = document.querySelector('input[name="ap_hi"]');
+            const apLo = document.querySelector('input[name="ap_lo"]');
+            
+            function validateBloodPressure() {
+                if (apHi.value && apLo.value) {
+                    const systolic = parseInt(apHi.value);
+                    const diastolic = parseInt(apLo.value);
+                    
+                    if (systolic <= diastolic) {
+                        apHi.setCustomValidity('Systolic pressure must be higher than diastolic pressure');
+                        apLo.setCustomValidity('Systolic pressure must be higher than diastolic pressure');
+                    } else {
+                        apHi.setCustomValidity('');
+                        apLo.setCustomValidity('');
+                    }
+                }
+            }
+            
+            apHi.addEventListener('input', validateBloodPressure);
+            apLo.addEventListener('input', validateBloodPressure);
+        });
+    </script>
+</body>
+</html>

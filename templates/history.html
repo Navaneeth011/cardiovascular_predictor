@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction History - Cardiovascular Risk Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'medical-blue': '#1e40af',
+                        'medical-red': '#dc2626',
+                        'medical-green': '#059669'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 300px;
+            max-height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-medical-blue mb-4">
+                📊 Prediction History & Analytics
+            </h1>
+            <p class="text-gray-600 text-lg max-w-2xl mx-auto">
+                Track your cardiovascular risk trends and compare your health metrics over time.
+            </p>
+            <div class="mt-4 space-x-4">
+                <a href="/" class="inline-block bg-medical-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-300">
+                    ← New Prediction
+                </a>
+                {% if predictions %}
+                <a href="/clear_history" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition duration-300"
+                   onclick="return confirm('Are you sure you want to clear all prediction history?')">
+                    🗑️ Clear History
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not predictions %}
+        <div class="text-center py-16">
+            <div class="text-6xl mb-4">📈</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">No Predictions Yet</h2>
+            <p class="text-gray-600 mb-8">Start by making your first cardiovascular risk prediction to see your health analytics here.</p>
+            <a href="/" class="inline-block bg-medical-blue text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300">
+                Make Your First Prediction
+            </a>
+        </div>
+        {% else %}
+
+        <!-- Statistics Overview -->
+        <div class="grid md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                <div class="text-3xl font-bold text-medical-blue mb-2">{{ predictions|length }}</div>
+                <div class="text-gray-600">Total Predictions</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                <div class="text-3xl font-bold {% if chart_data[-1].probability > 0.5 %}text-medical-red{% else %}text-medical-green{% endif %} mb-2">
+                    {{ "%.1f"|format(chart_data[-1].probability * 100) }}%
+                </div>
+                <div class="text-gray-600">Latest Risk</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                <div class="text-3xl font-bold text-gray-800 mb-2">{{ chart_data[-1].bmi }}</div>
+                <div class="text-gray-600">Current BMI</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                <div class="text-3xl font-bold text-purple-600 mb-2">
+                    {{ chart_data[-1].ap_hi }}/{{ chart_data[-1].ap_lo }}
+                </div>
+                <div class="text-gray-600">Blood Pressure</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid lg:grid-cols-2 gap-8 mb-8">
+            <!-- Risk Trend Chart -->
+            <div class="bg-white rounded-xl shadow-lg p-6 h-[400px] flex flex-col">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Cardiovascular Risk Trend</h3>
+                <div class="chart-container flex-grow">
+                    <canvas id="riskTrendChart"></canvas>
+                </div>
+                <p class="text-sm text-gray-600 mt-4">
+                    <strong>Insight:</strong> 
+                    {% set latest_risk = chart_data[-1].probability * 100 %}
+                    {% if chart_data|length > 1 %}
+                        {% set previous_risk = chart_data[-2].probability * 100 %}
+                        {% if latest_risk > previous_risk %}
+                        Your risk has increased by {{ "%.1f"|format(latest_risk - previous_risk) }}% since your last prediction.
+                        {% elif latest_risk < previous_risk %}
+                        Great news! Your risk has decreased by {{ "%.1f"|format(previous_risk - latest_risk) }}% since your last prediction.
+                        {% else %}
+                        Your risk level has remained stable since your last prediction.
+                        {% endif %}
+                    {% else %}
+                    Track your risk over time by making more predictions.
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- Health Metrics Comparison -->
+            <div class="bg-white rounded-xl shadow-lg p-6 h-[400px] flex flex-col">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Your Metrics vs Dataset Average</h3>
+                <div class="chart-container flex-grow">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+                <p class="text-sm text-gray-600 mt-4">
+                    <strong>Key Finding:</strong> 
+                    {% if chart_data[-1].ap_hi > dataset_stats.avg_ap_hi %}
+                    Your systolic blood pressure ({{ chart_data[-1].ap_hi }}) is above the dataset average ({{ "%.0f"|format(dataset_stats.avg_ap_hi) }}), which significantly contributes to cardiovascular risk.
+                    {% elif chart_data[-1].weight > dataset_stats.avg_weight %}
+                    Your weight is above average, which may contribute to increased cardiovascular risk.
+                    {% else %}
+                    Your key health metrics are within healthy ranges compared to the dataset average.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Detailed History Table -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-6">Detailed Prediction History</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-3 px-4">Date</th>
+                            <th class="text-left py-3 px-4">Risk Level</th>
+                            <th class="text-left py-3 px-4">Probability</th>
+                            <th class="text-left py-3 px-4">BMI</th>
+                            <th class="text-left py-3 px-4">Blood Pressure</th>
+                            <th class="text-left py-3 px-4">Risk Factors</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prediction in predictions|reverse %}
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                {{ prediction.timestamp[:19]|replace('T', ' ') }}
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
+                                           {% if prediction.result.prediction == 1 %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                    {{ prediction.result.risk_level }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 font-medium">
+                                {{ "%.1f"|format(prediction.result.probability * 100) }}%
+                            </td>
+                            <td class="py-3 px-4">{{ prediction.bmi }}</td>
+                            <td class="py-3 px-4">
+                                {{ prediction.input.ap_hi }}/{{ prediction.input.ap_lo }}
+                            </td>
+                            <td class="py-3 px-4">
+                                {% if prediction.risk_factors %}
+                                <span class="text-xs text-red-600">
+                                    {{ prediction.risk_factors|length }} factor(s)
+                                </span>
+                                {% else %}
+                                <span class="text-xs text-green-600">None identified</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+
+    <script>
+        // Parse JSON data safely
+        const chartData = JSON.parse('{{ chart_data|tojson|safe }}');
+        const datasetStats = JSON.parse('{{ dataset_stats|tojson|safe }}');
+
+        // Risk Trend Chart
+        if (chartData && chartData.length > 0) {
+            const ctx1 = document.getElementById('riskTrendChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(d => new Date(d.timestamp).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Cardiovascular Risk (%)',
+                        data: chartData.map(d => d.probability * 100),
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#dc2626',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            // Health Metrics Comparison Chart
+            const ctx2 = document.getElementById('metricsChart').getContext('2d');
+            const latestData = chartData[chartData.length - 1];
+            
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Weight (kg)', 'Systolic BP', 'Diastolic BP', 'BMI'],
+                    datasets: [{
+                        label: 'Your Values',
+                        data: [
+                            latestData.weight || 0,
+                            latestData.ap_hi || 0,
+                            latestData.ap_lo || 0,
+                            latestData.bmi || 0
+                        ],
+                        backgroundColor: 'rgba(30, 64, 175, 0.8)',
+                        borderColor: '#1e40af',
+                        borderWidth: 1
+                    }, {
+                        label: 'Dataset Average',
+                        data: [
+                            datasetStats.avg_weight || 0,
+                            datasetStats.avg_ap_hi || 0,
+                            datasetStats.avg_ap_lo || 0,
+                            25  // Average BMI approximation
+                        ],
+                        backgroundColor: 'rgba(107, 114, 128, 0.6)',
+                        borderColor: '#6b7280',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Smooth scroll animations
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.bg-white');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+    </script>
+</body>
+</html>
